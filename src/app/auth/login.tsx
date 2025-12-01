@@ -1,16 +1,27 @@
 // src/app/auth/login.tsx
-import { useAuth } from '@/src/contexts/AuthContext'
+//import { useAuth } from '@/src/contexts/AuthContext'
 import { Image } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
+import { useRouter } from 'expo-router'
 import { useState } from 'react'
-import { ImageBackground, KeyboardAvoidingView, Platform, Text, TextInput, TouchableOpacity, View } from 'react-native'
-
+import { Alert, ImageBackground, KeyboardAvoidingView, Platform, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { authAPI } from '../../api/auth'
 const blurhash = '|rF?hV%-2t=kIWj@XCadJB$4R%xgUk%fljs8f6jb|AD'
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const { signInWithEmail, signInWithGoogle } = useAuth()
+  const router = useRouter()
+
+  const handleLogin = async () => {
+    try {
+      await authAPI.signInWithUsername(username, password)
+      // ĐĂNG NHẬP THÀNH CÔNG → TỰ ĐỘNG CHUYỂN SANG PROFILE
+      router.replace('../(tabs)/profile')   // ← DÒNG QUAN TRỌNG NHẤT!
+    } catch (error: any) {
+      Alert.alert('Lỗi đăng nhập', error.message)
+    }
+  }
 
   return (
     <ImageBackground
@@ -35,11 +46,11 @@ export default function LoginScreen() {
           {/* Form */}
           <View style={{ backgroundColor: '#ffffff30', borderRadius: 20, padding: 20, backdropFilter: 'blur(10px)', borderWidth: 1, borderColor: '#ffffff40' }}>
             <TextInput
-              placeholder="Email"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
+              placeholder="Username"
+              value={username}
+              onChangeText={setUsername}
               autoCapitalize="none"
+              autoCorrect={false}
               style={{ backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 15, fontSize: 16 }}
               placeholderTextColor="#999"
             />
@@ -53,7 +64,7 @@ export default function LoginScreen() {
             />
 
             <TouchableOpacity
-              onPress={() => signInWithEmail(email, password)}
+              onPress={handleLogin}
               style={{ backgroundColor: '#FF6AC1', padding: 16, borderRadius: 12, alignItems: 'center' }}
             >
               <Text style={{ color: '#fff', fontSize: 18, fontWeight: '600' }}>Đăng nhập</Text>
@@ -65,7 +76,7 @@ export default function LoginScreen() {
 
             {/* Nút Google */}
             <TouchableOpacity
-              onPress={signInWithGoogle}
+              //onPress={}
               style={{ backgroundColor: '#fff', padding: 14, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 }}
             >
               <Image source={require('../../../assets/images/google.png')} style={{ width: 24, height: 24 }} />

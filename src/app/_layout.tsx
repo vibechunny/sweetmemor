@@ -1,16 +1,38 @@
-// src/app/_layout.tsx   ← FILE NÀY PHẢI SẠCH 100%
-import { AuthProvider } from '@/src/contexts/AuthContext'
-import { Stack } from 'expo-router'
+// src/app/_layout.tsx
+import { AuthProvider, useAuth } from '@/src/contexts/AuthContext'
+import { Redirect, Stack } from 'expo-router'
+import { ActivityIndicator, View } from 'react-native'
 
-export default function RootLayout() {
+function RootLayout() {
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <View className="flex-1 justify-center items-center">
+        <ActivityIndicator size="large" color="#3b82f6" />
+      </View>
+    )
+  }
+
   return (
-    <AuthProvider>
+    <>
+      {user ? (
+        <Redirect href="../(tabs)/profile" />
+      ) : (
+        <Redirect href="/auth/login" />
+      )}
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="auth/login" />
-        <Stack.Screen name="auth/register" />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>
+    </>
+  )
+}
+
+export default function Layout() {
+  return (
+    <AuthProvider>
+      <RootLayout />
     </AuthProvider>
   )
 }

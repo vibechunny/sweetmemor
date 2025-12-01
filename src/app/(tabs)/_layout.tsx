@@ -1,35 +1,39 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
-
-import { Colors } from '@/constants/theme';
-import { HapticTab } from '@/src/components/haptic-tab';
-import { IconSymbol } from '@/src/components/ui/icon-symbol';
-import { useColorScheme } from '@/src/hooks/use-color-scheme';
+// src/app/(tabs)/_layout.tsx   ← PHẢI CÓ FILE NÀY MỚI HIỆN TAB BAR
+import { Ionicons } from '@expo/vector-icons'
+import { Tabs } from 'expo-router'
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
-        tabBarButton: HapticTab,
-      }}>
+        tabBarActiveTintColor: '#3b82f6',
+        tabBarInactiveTintColor: '#9ca3af',
+        tabBarStyle: { height: 60, paddingBottom: 10 },
+        tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
+      }}
+    >
       <Tabs.Screen
-        name="index"
+        name="home"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          title: 'Trang chủ',
+          tabBarIcon: ({ color }) => <Ionicons name="home-outline" size={26} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="friends"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: 'Bạn bè',
+          tabBarIcon: ({ color }) => <Ionicons name="people-outline" size={26} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Cá nhân',
+          tabBarIcon: ({ color }) => <Ionicons name="person-outline" size={26} color={color} />,
         }}
       />
     </Tabs>
-  );
+  )
 }

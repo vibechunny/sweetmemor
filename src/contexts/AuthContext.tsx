@@ -1,16 +1,10 @@
 // src/contexts/AuthContext.tsx
-import { supabase } from '@/src/lib/supabase'
-import { Session, User } from '@supabase/supabase-js'
-import * as Google from 'expo-auth-session/providers/google'
-import * as WebBrowser from 'expo-web-browser'
-import React, { createContext, useContext, useEffect, useState } from 'react'
-import { Alert } from 'react-native'
-
-WebBrowser.maybeCompleteAuthSession()
+import type { User } from '@supabase/supabase-js'
+import { createContext, ReactNode, useContext, useEffect, useState } from 'react'
+import { supabase } from '../api/client'
 
 type AuthContextType = {
   user: User | null
-  session: Session | null
   loading: boolean
   signInWithEmail: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string, username: string) => Promise<void>
@@ -18,35 +12,21 @@ type AuthContextType = {
   signOut: () => Promise<void>
 }
 
-const AuthContext = createContext<AuthContextType>({
-  user: null,
-  session: null,
-  loading: true,
-  signInWithEmail: async () => {},
-  signUp: async () => {},
-  signInWithGoogle: async () => {},
-  signOut: async () => {},
-})
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-  const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Google Auth
-  const [request, response, promptAsync] = Google.useAuthRequest({
-  clientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID        
-})
-
   useEffect(() => {
+    // Lấy session hiện tại
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
     })
 
+    // Lắng nghe thay đổi auth (login, logout, refresh…)
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
     })
@@ -54,20 +34,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => listener.subscription.unsubscribe()
   }, [])
 
-  // Xử lý Google login callback
-  useEffect(() => {
-    if (response?.type === 'success') {
-      const { authentication } = response
-      supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: 'myapp://redirect' },
-      })
-    }
-  }, [response])
-
   const signInWithEmail = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) Alert.alert('Lỗi đăng nhập', error.message)
+    if (error) throw error
   }
 
   const signUp = async (email: string, password: string, username: string) => {
@@ -76,23 +45,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       password,
       options: { data: { username } },
     })
-    if (error) Alert.alert('Lỗi đăng ký', error.message)
-    else Alert.alert('Thành công!', 'Check email để xác nhận nhé')
+    if (error) throw error
   }
 
   const signInWithGoogle = async () => {
-    await promptAsync()
+    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' })
+    if (error) throw error
   }
 
   const signOut = async () => {
-    await supabase.auth.signOut()
+    const { error } = await supabase.auth.signOut()
+    if (error) throw error
   }
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signInWithEmail, signUp, signInWithGoogle, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signInWithEmail, signUp, signInWithGoogle, signOut }}>
       {children}
     </AuthContext.Provider>
   )
 }
 
-export const useAuth = () => useContext(AuthContext)
+export const useAuth = () => {
+  const context = useContext(AuthContext)
+  if (!context) throw new Error('useAuth must be used within AuthProvider')
+  return context
+}
