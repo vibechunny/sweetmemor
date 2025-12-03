@@ -1,8 +1,8 @@
 // src/app/_layout.tsx
-import { AuthProvider, useAuth } from '@/src/contexts/AuthContext'
-import { Redirect, Stack } from 'expo-router'
-import { ActivityIndicator, View } from 'react-native'
-
+import { AuthProvider, useAuth } from '@/src/contexts/AuthContext';
+import { Redirect, Stack } from 'expo-router';
+import { ActivityIndicator, View } from 'react-native';
+import "../../global.css";
 function RootLayout() {
   const { user, loading } = useAuth()
 
