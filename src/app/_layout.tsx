@@ -1,38 +1,54 @@
 // src/app/_layout.tsx
-import { AuthProvider, useAuth } from '@/src/contexts/AuthContext';
-import { Redirect, Stack } from 'expo-router';
-import { ActivityIndicator, View } from 'react-native';
+import { supabase } from '@/src/api/client'; // Đường dẫn đến file khởi tạo supabase của bạn
+import { Session } from '@supabase/supabase-js';
+import { Stack, useRouter, useSegments } from 'expo-router';
+import { useEffect, useState } from 'react';
 import "../../global.css";
-function RootLayout() {
-  const { user, loading } = useAuth()
 
-  if (loading) {
-    return (
-      <View className="flex-1 justify-center items-center">
-        <ActivityIndicator size="large" color="#3b82f6" />
-      </View>
-    )
-  }
+export default function RootLayout() {
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null); // null nghĩa là đang kiểm tra
+  const segments = useSegments();
+  const router = useRouter();
+  const [session, setSession] = useState<Session | null>(null);
+  const [initialized, setInitialized] = useState(false);
+
+  // GIẢ LẬP: Kiểm tra trạng thái đăng nhập từ Storage hoặc Supabase
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setInitialized(true);
+    });
+
+    // 2. Lắng nghe thay đổi trạng thái (Login/Logout)
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!initialized) return;
+
+    const inAuthGroup = segments[0] === 'auth';
+
+    if (!session && !inAuthGroup) {
+      // 1. Nếu chưa login và đang ở ngoài trang auth -> Bắt về Login
+      router.replace('/auth/login');
+    } else if (session && inAuthGroup) {
+      // 2. Nếu đã login mà lại ở trang auth -> Đẩy vào Home
+      router.replace('/(tabs)/home');
+    }
+  }, [session, initialized, segments]);
 
   return (
-    <>
-      {user ? (
-        <Redirect href="../(tabs)/profile" />
-      ) : (
-        <Redirect href="/auth/login" />
-      )}
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="auth/login" />
-      </Stack>
-    </>
-  )
-}
-
-export default function Layout() {
-  return (
-    <AuthProvider>
-      <RootLayout />
-    </AuthProvider>
-  )
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" />
+      <Stack.Screen name="auth/login" />
+      <Stack.Screen name="auth/register" />
+      <Stack.Screen name="(tabs)" />
+    </Stack>
+  );
 }

@@ -3,5 +3,11 @@
     "source.fixAll": "explicit",
     "source.organizeImports": "explicit",
     "source.sortMembers": "explicit"
-  }
+  },
+  "eslint.rules.customizations": [
+  { "rule": "*", "severity": "warn" }
+],
+  "eslint.enable": true,
+  "eslint.run": "onSave"
+
 }

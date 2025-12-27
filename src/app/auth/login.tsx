@@ -6,8 +6,9 @@ import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import { Alert, ImageBackground, KeyboardAvoidingView, Platform, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { authAPI } from '../../api/auth'
-const blurhash = '|rF?hV%-2t=kIWj@XCadJB$4R%xgUk%fljs8f6jb|AD'
 
+
+const blurhash = '|rF?hV%-2t=kIWj@XCadJB$4R%xgUk%fljs8f6jb|AD'
 export default function LoginScreen() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -83,8 +84,11 @@ export default function LoginScreen() {
               <Text style={{ fontSize: 16, fontWeight: '600' }}>Tiếp tục với Google</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={{ alignItems: 'center', marginTop: 20 }}>
-              <Text style={{ color: '#fff', textDecorationLine: 'underline' }}>Chưa có tài khoản? Đăng ký ngay →</Text>
+            <TouchableOpacity style={{ alignItems: 'center', marginTop: 20 }}
+              // router.push('./register') 
+              onPress={() =>  router.push('/auth/register') }>
+              <Text style={{ color: '#fff', textDecorationLine: 'underline' }}>Chưa có tài khoản? Đăng ký ngay →
+              </Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>

@@ -1,6 +1,7 @@
 // src/app/(tabs)/profile.tsx
 import { authAPI } from '@/src/api/auth';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
 import { useEffect, useState } from 'react';
@@ -14,9 +15,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { supabase } from '../../api/client';
+import { profileAPI } from '../../api/profile';
 
 export default function ProfileScreen() {
-  const [user, setUser] = useState<any>(null);
+  //const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const { colorScheme } = useColorScheme();
@@ -24,12 +27,11 @@ export default function ProfileScreen() {
 
   // Form state
   const [form, setForm] = useState({
-    name: '',
-    email: '',
-    username: '',
-    password: '',
-    birthDate: '',
+    full_name: '',
+    username: ''
   });
+
+  const [avatar_url, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
     fetchUserProfile();
@@ -39,14 +41,19 @@ export default function ProfileScreen() {
     try {
       const { data: { user } } = await authAPI.getCurrentUser();
       if (user) {
-        setUser(user);
+        let { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+
+        //setUser(user);
         setForm({
-          name: user.user_metadata?.full_name || '',
-          email: user.email || '',
-          username: user.user_metadata?.username || '',
-          password: '',
-          birthDate: user.user_metadata?.birth_date || '01.02.1999',
+          full_name: data?.full_name || '',
+          username: data?.username || ''
         });
+
+        setAvatarUrl(data?.avatar_url || null);
       }
     } catch (error) {
       console.error(error);
@@ -69,34 +76,26 @@ export default function ProfileScreen() {
     ]);
   };
 
-  // const handleSaveProfile = async () => {
-  //   try {
-  //     const updates = {
-  //       data: {
-  //         //birth_date: form.birthdate,
-  //         username: form.username,
-  //         full_name: form.name,
-  //         //avatar_url?: form.avatar_url
-  //       },
-  //     };
+  const handleSaveProfile = async () => {
+    try {
+      const updates = {
+          username: form.username,
+          full_name: form.full_name
+      };
 
-  //     // if (form.password) {
-  //     //   await profileAPI.updateUser({ password: form.password });
-  //     // }
+      const { error } = await profileAPI.updateProfile(updates);
+      if (error) {
+        Alert.alert('Lỗi', error.message);
+        return;
+      }
 
-  //     const { error } = await profileAPI.updateProfile(updates);
-  //     if (error) {
-  //       Alert.alert('Lỗi', error.message);
-  //       return;
-  //     }
-
-  //     Alert.alert('Thành công', 'Cập nhật hồ sơ thành công!');
-  //     setEditModalVisible(false);
-  //     fetchUserProfile();
-  //   } catch (error: any) {
-  //     Alert.alert('Lỗi', error.message);
-  //   }
-  // };
+      Alert.alert('Thành công', 'Cập nhật hồ sơ thành công!');
+      setEditModalVisible(false);
+      fetchUserProfile();
+    } catch (error: any) {
+      Alert.alert('Lỗi', error.message);
+    }
+  };
 
   if (loading) {
     return (
@@ -106,6 +105,57 @@ export default function ProfileScreen() {
     );
   }
 
+  const handleAvatarChange = async () => {
+    // 1. Mở thư viện ảnh
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,      // cho crop tròn đẹp
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (result.canceled || !result.assets[0]) return;
+
+    const file = result.assets[0];
+    const fileUri = file.uri;
+    const fileExt = fileUri.split('.').pop();
+    const fileName = `${Math.random()}.${fileExt}`;
+    const filePath = `${fileName}`;
+    // 2. Lấy user id
+    const { data: { user } } = await authAPI.getCurrentUser();
+    if (!user) {
+      Alert.alert('Lỗi', 'Bạn cần đăng nhập');
+      return;
+    }
+    
+    const response = await fetch(fileUri);
+
+    const arrayBuffer = await response.arrayBuffer();
+
+    const { data, error } = await supabase.storage
+      .from('avatars')
+      .upload(filePath, arrayBuffer, {
+        contentType: file.mimeType || 'image/jpeg',
+        upsert: true
+      });
+
+    if (error) throw error;
+
+    // 6. Lấy URL public
+    const { data: { publicUrl } } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(fileName);
+
+    // 7. Cập nhật vào bảng profiles
+    await profileAPI.updateProfile({ avatar_url: publicUrl });
+
+    // 8. Cập nhật UI ngay lập tức
+    setAvatarUrl(publicUrl); 
+
+    Alert.alert('Thành công', 'Avatar đã được cập nhật');
+    return data.path;
+  };
+
   return (
     <ScrollView className="flex-1 bg-gray-50 dark:bg-gray-900">
       {/* Header Profile */}
@@ -114,18 +164,18 @@ export default function ProfileScreen() {
           <View className="relative">
             <Image
               source={{
-                uri: user?.user_metadata?.avatar_url ||
-                  'https://ui-avatars.com/api/?name=' + encodeURIComponent(form.name || 'User') + '&background=random',
+                uri: avatar_url ||
+                  'https://ui-avatars.com/api/?name=' + encodeURIComponent(form.full_name || 'User') + '&background=random',
               }}
               className="w-24 h-24 rounded-full border-4 border-white shadow-lg"
             />
-            <TouchableOpacity className="absolute bottom-0 right-0 bg-blue-500 p-2 rounded-full border-4 border-white">
-              <Ionicons name="camera" size={18} color="white" />
+            <TouchableOpacity onPress={handleAvatarChange} className="absolute bottom-0 right-0 bg-blue-500 p-2 rounded-full border-4 border-white">
+              <Ionicons name="camera" size={18} color="white"/>
             </TouchableOpacity>
           </View>
 
           <Text className="text-2xl font-bold mt-4 text-gray-900 dark:text-white">
-            {form.name || 'Tên người dùng'}
+            {form.full_name || 'Tên người dùng'}
           </Text>
           <Text className="text-gray-500 dark:text-gray-400">
             @{form.username || 'username'}
@@ -144,8 +194,7 @@ export default function ProfileScreen() {
       <View className="mt-6 bg-white dark:bg-gray-800">
         {[
           { icon: 'settings-outline', label: 'Settings', onPress: () => router.push('/') },
-          { icon: 'card-outline', label: 'Billing Details', onPress: () => {} },
-          { icon: 'people-outline', label: 'User Management', onPress: () => {} },
+         
           { icon: 'information-circle-outline', label: 'Information', onPress: () => {} },
         ].map((item, index) => (
           <TouchableOpacity
@@ -184,11 +233,8 @@ export default function ProfileScreen() {
           <ScrollView className="flex-1 px-6 mt-6">
             <View className="space-y-5">
               {[
-                { label: 'Name', value: form.name, key: 'name' },
-                { label: 'Email Address', value: form.email, key: 'email', editable: false },
+                { label: 'Name', value: form.full_name, key: 'full_name' },
                 { label: 'Username', value: form.username, key: 'username', prefix: '@' },
-                { label: 'Password', value: form.password, key: 'password', secure: true },
-                { label: 'Birth Date', value: form.birthDate, key: 'birthDate' },
               ].map((field) => (
                 <View key={field.key}>
                   <Text className="text-gray-600 dark:text-gray-400 text-sm mb-2">{field.label}</Text>
@@ -200,8 +246,8 @@ export default function ProfileScreen() {
                           className="flex-1 ml-1 text-gray-900 dark:text-white"
                           value={field.prefix ? form[field.key as keyof typeof form].replace('@', '') : form[field.key as keyof typeof form]}
                           onChangeText={(text) => setForm({ ...form, [field.key]: field.prefix ? text : text })}
-                          editable={field.editable !== false}
-                          secureTextEntry={field.secure}
+                          editable={true}
+                          secureTextEntry={false}
                         />
                       </View>
                     ) : (
@@ -209,8 +255,8 @@ export default function ProfileScreen() {
                         className="text-gray-900 dark:text-white"
                         value={form[field.key as keyof typeof form]}
                         onChangeText={(text) => setForm({ ...form, [field.key]: text })}
-                        editable={field.editable !== false}
-                        secureTextEntry={field.secure}
+                        editable={true}
+                        secureTextEntry={false}
                         placeholder={field.label}
                         placeholderTextColor="#94a3b8"
                       />
@@ -225,7 +271,7 @@ export default function ProfileScreen() {
               </View>
 
               <TouchableOpacity
-                //onPress={handleSaveProfile}
+                onPress={handleSaveProfile}
                 className="mt-8 bg-blue-500 py-4 rounded-full"
               >
                 <Text className="text-white text-center font-semibold text-lg">Save Changes</Text>
@@ -246,66 +292,3 @@ export default function ProfileScreen() {
 }
 
 
-
-
-
-
-
-
-
-// // src/app/(tabs)/profile.tsx  ← copy nguyên cái này đè lên file cũ
-// import { useAuth } from '@/src/contexts/AuthContext'
-// import { Ionicons } from '@expo/vector-icons'
-// import { useRouter } from 'expo-router'
-// import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native'
-
-// export default function Profile() {
-//   const { signOut } = useAuth()
-//   const router = useRouter()
-
-//   const logout = async () => {
-//     await signOut()
-//     router.replace('/auth/login')
-//   }
-
-//   return (
-//     <ScrollView style={{ flex: 1, backgroundColor: '#f8f9fa' }}>
-//       <View style={{ alignItems: 'center', paddingTop: 60, paddingBottom: 30, backgroundColor: '#e3f2fd' }}>
-//         <View style={{ position: 'relative' }}>
-//           <Image
-//             source={{ uri: 'https://via.placeholder.com/120' }}
-//             style={{ width: 120, height: 120, borderRadius: 60, borderWidth: 4, borderColor: 'white' }}
-//           />
-//           <View style={{ position: 'absolute', bottom: 0, right: 0, backgroundColor: '#1976d2', padding: 10, borderRadius: 30 }}>
-//             <Ionicons name="camera" size={24} color="white" />
-//           </View>
-//         </View>
-
-//         <Text style={{ fontSize: 28, fontWeight: 'bold', marginTop: 16 }}>Chunnỳ</Text>
-//         <Text style={{ fontSize: 18, color: '#1976d2', marginTop: 4 }}>@vibechunny3</Text>
-
-//         <TouchableOpacity style={{ marginTop: 20, backgroundColor: '#1976d2', paddingHorizontal: 32, paddingVertical: 12, borderRadius: 30 }}>
-//           <Text style={{ color: 'white', fontSize: 18, fontWeight: '600' }}>Chỉnh sửa hồ sơ</Text>
-//         </TouchableOpacity>
-//       </View>
-
-//       <View style={{ marginTop: 20 }}>
-//         <Item icon="settings-outline" title="Cài đặt" />
-//         <Item icon="card-outline" title="Thông tin thanh toán" />
-//         <Item icon="people-outline" title="Quản lý bạn bè" />
-//         <Item icon="information-circle-outline" title="Thông tin ứng dụng" />
-//         <Item icon="log-out-outline" title="Đăng xuất" color="#d32f2f" onPress={logout} />
-//       </View>
-//     </ScrollView>
-//   )
-// }
-
-// function Item({ icon, title, color = '#212121', onPress }: any) {
-//   return (
-//     <TouchableOpacity onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center', padding: 18, backgroundColor: 'white', borderBottomWidth: 1, borderColor: '#eee' }}>
-//       <Ionicons name={icon} size={28} color={color} />
-//       <Text style={{ flex: 1, marginLeft: 16, fontSize: 18, color }}>{title}</Text>
-//       <Ionicons name="chevron-forward" size={24} color="#999" />
-//     </TouchableOpacity>
-//   )
-// }
