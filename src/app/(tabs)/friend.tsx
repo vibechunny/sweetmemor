@@ -1,19 +1,60 @@
+import { friendsAPI } from '@/src/api/friend';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import type { Friendship } from '../../api/type';
 
-export default function FriendsScreen() {
-  const [activeTab, setActiveTab] = useState('All friends');
 
-  const tabs = ['All friends', 'Pending', 'Block'];
+export default  function FriendsScreen() {
 
-  // Dữ liệu giả lập (giống hình)
-  const friends = [
-    { id: 1, name: 'Asma islam chua', subtitle: 'Love music, love world', avatar: 'https://randomuser.me/api/portraits/women/44.jpg', added: false },
-    { id: 2, name: 'Alamgir Hosain', subtitle: 'Love music, love world', avatar: 'https://randomuser.me/api/portraits/men/45.jpg', added: true },
-    { id: 3, name: 'Bablu khan bablu', subtitle: 'Love music, love world', avatar: 'https://randomuser.me/api/portraits/men/46.jpg', added: false },
-    { id: 4, name: 'Shaidul Islam Shishir', subtitle: 'Love music, love world', avatar: 'https://randomuser.me/api/portraits/men/47.jpg', added: false },
-  ];
+  const [activeTab, setActiveTab] = useState('All');
+  const [allFriends, setAllFriends] = useState<Friendship[]>([]);
+  const [filterFriends, setFilterFriends] = useState<Friendship[]>([]);
+  const [loading, setLoading] = useState(true);
+  const tabs = ['All', 'Pending', 'Rejected', 'Blocked'];
+
+  // Gọi API trong useEffect
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const data = await friendsAPI.getFriendsList();
+        setAllFriends(data); // Lưu dữ liệu vào state
+
+        const defaultList = data.filter(f => f.status === 'accepted');
+        setFilterFriends(defaultList);
+
+      } catch (error) {
+        console.error("Lỗi khi lấy dữ liệu:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+
+  const listenTabAndFilterFriends = (tab: string) => {
+    setActiveTab(tab);
+
+    let statusToFilter = '';
+    switch (tab) {
+      case 'All': statusToFilter = 'accepted'; break;
+      case 'Pending': statusToFilter = 'pending'; break;
+      case 'Rejected': statusToFilter = 'rejected'; break;
+      case 'Blocked': statusToFilter = 'blocked'; break;
+    }
+
+    if (statusToFilter) {
+      const filtered = allFriends.filter(f => f.status === statusToFilter);
+      setFilterFriends(filtered);
+    } else {
+      // Trường hợp không xác định hoặc muốn hiện tất cả không lọc
+      setFilterFriends(allFriends);
+    }
+  }
+
+  if (loading) return <Text>Loading...</Text>;
 
   return (
     <View className="flex-1 bg-white">
@@ -22,12 +63,7 @@ export default function FriendsScreen() {
         <TouchableOpacity>
           <Ionicons name="chevron-back" size={28} color="black" />
         </TouchableOpacity>
-        <Text className="text-xl font-semibold ml-4">Your Friends</Text>
-      </View>
-
-      {/* Số lượng friends */}
-      <View className="px-6 py-4">
-        <Text className="text-2xl font-bold">256 Friends</Text>
+        <Text className="text-xl font-semibold ml-4">Friends list</Text>
       </View>
 
       {/* Tabs */}
@@ -35,7 +71,7 @@ export default function FriendsScreen() {
         {tabs.map((tab) => (
           <TouchableOpacity
             key={tab}
-            onPress={() => setActiveTab(tab)}
+            onPress={() => listenTabAndFilterFriends(tab)}
             className={`flex-1 py-3 items-center border-b-2 ${
               activeTab === tab ? 'border-blue-500' : 'border-transparent'
             }`}
@@ -53,39 +89,29 @@ export default function FriendsScreen() {
 
       {/* Danh sách bạn bè */}
       <ScrollView className="flex-1 px-6 pt-4">
-        <Text className="text-sm text-gray-500 mb-4">Choose your friend</Text>
+        <Text className="text-sm text-gray-500 mb-4">{filterFriends.length} friends</Text>
 
-        {friends.map((friend) => (
-          <View key={friend.id} className="flex-row items-center justify-between mb-5">
+        {filterFriends.map((friendship) => (
+          <View key={friendship.friend?.id} className="flex-row items-center justify-between mb-5">
             <View className="flex-row items-center">
-              {friend.id === 2 && (
-                <View className="absolute left-8 bottom-0 w-4 h-4 bg-blue-500 rounded-full border-2 border-white z-10 flex items-center justify-center">
-                  <Text className="text-white text-xs">✓</Text>
-                </View>
-              )}
+
               <Image
-                source={{ uri: friend.avatar }}
+                source={{ uri: friendship.friend?.avatar_url || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(friendship.friend?.full_name || 'User') + '&background=random',}}
                 className="w-14 h-14 rounded-full mr-4"
               />
               <View>
-                <Text className="font-semibold text-base">{friend.name}</Text>
-                <Text className="text-gray-500 text-sm">{friend.subtitle}</Text>
+                <Text className="font-semibold text-base">{friendship.friend?.full_name}</Text>
+                <Text className="text-gray-500 text-sm">{friendship.friend?.username}</Text>
               </View>
             </View>
 
             <TouchableOpacity
-              className={`px-6 py-2 rounded-full ${
-                friend.added
-                  ? 'bg-gray-200'
-                  : 'bg-blue-500'
-              }`}
+              className={`px-6 py-2 rounded-full `}
             >
               <Text
-                className={`font-medium ${
-                  friend.added ? 'text-gray-600' : 'text-white'
-                }`}
+                className={`font-medium text-white`}
               >
-                {friend.added ? 'Added' : 'Add'}
+                Added
               </Text>
             </TouchableOpacity>
           </View>

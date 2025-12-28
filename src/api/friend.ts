@@ -17,6 +17,16 @@ export const friendsAPI = {
   // Gửi kết bạn
   sendFriendRequest: async (friendId: string) => {
     const userId = (await supabase.auth.getUser()).data.user?.id
+    // check trùng
+    let isSendRequest = await supabase
+      .from('friendships')
+      .select('*')
+      .or(`and(user_id.eq.${userId},friend_id.eq.${friendId}),and(friend_id.eq.${userId},user_id.eq.${friendId})`)
+      .single();
+
+    if (isSendRequest != null) {
+      throw new Error('Friend request already sent')
+    }
     const { data, error } = await supabase
       .from('friendships')
       .insert({ user_id: userId, friend_id: friendId })
@@ -26,7 +36,7 @@ export const friendsAPI = {
   },
 
   // Chấp nhận / từ chối
-  respondFriendRequest: async (requestId: string, status: 'accepted' | 'rejected') => {
+  respondFriendRequest: async (requestId: string, status: 'accepted' | 'rejected' | 'blocked') => {
     const { data, error } = await supabase
       .from('friendships')
       .update({ status })
@@ -37,13 +47,24 @@ export const friendsAPI = {
 
   // Danh sách bạn bè + pending
   getFriendsList: async (): Promise<Friendship[]> => {
-    const userId = (await supabase.auth.getUser()).data.user?.id
-    const { data, error } = await supabase
+    const userId = (await supabase.auth.getUser()).data.user?.id;
+    if (!userId) return [];
+    const { data: sentRequests, error: error1 } = await supabase
       .from('friendships')
       .select('*, friend:friend_id (*)') // join profile bạn bè
-      .or(`user_id.eq.${userId},friend_id.eq.${userId}`)
+      .eq(`user_id`, userId)
       .order('created_at', { ascending: false })
-    if (error) throw error
-    return data
+
+    const { data: receivedRequests, error: error2 } = await supabase
+      .from('friendships')
+      .select('*, friend:user_id (*)') // join profile bạn bè
+      .eq(`friend_id`, userId)
+      .order('created_at', { ascending: false })
+
+    if (error1 || error2) throw (error1 || error2);
+    const allData = [...(sentRequests || []), ...(receivedRequests || [])];
+    return allData.sort((a, b) => 
+    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
   },
 }
