@@ -14,19 +14,32 @@ export const friendsAPI = {
     return data
   },
 
+  getProfileByUsername: async (username: string) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, username, full_name, avatar_url, qr_code')
+      .eq('username', username.trim())
+      .single()
+    if (error) throw error
+    return { data, error }
+  },
   // Gửi kết bạn
   sendFriendRequest: async (friendId: string) => {
     const userId = (await supabase.auth.getUser()).data.user?.id
     // check trùng
-    let isSendRequest = await supabase
+    const { data: existingRequest, error: checkError } = await supabase
       .from('friendships')
       .select('*')
       .or(`and(user_id.eq.${userId},friend_id.eq.${friendId}),and(friend_id.eq.${userId},user_id.eq.${friendId})`)
-      .single();
+      .maybeSingle();
 
-    if (isSendRequest != null) {
-      throw new Error('Friend request already sent')
+    if (checkError) throw checkError;
+    if (existingRequest) {
+    if (existingRequest.status === 'accepted') {
+      throw new Error('Hai bạn đã là bạn bè rồi!');
     }
+    throw new Error('Lời mời kết bạn đã tồn tại hoặc đang chờ xử lý');
+  }
     const { data, error } = await supabase
       .from('friendships')
       .insert({ user_id: userId, friend_id: friendId })
@@ -66,5 +79,20 @@ export const friendsAPI = {
     return allData.sort((a, b) => 
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
+  },
+
+  unfriend: async (friendshipId: string) => {
+    try {
+    const userId = (await supabase.auth.getUser()).data.user?.id
+
+    const { error } = await supabase
+      .from('friendships')
+      .delete()
+      .or(`and(user_id.eq.${userId},friend_id.eq.${friendshipId}),and(user_id.eq.${friendshipId},friend_id.eq.${userId})`)
+    if (error) return error
+  } 
+   catch (err) {
+    console.error("Lỗi hủy kết bạn:", err);
+  }
   },
 }

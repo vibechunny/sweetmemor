@@ -7,24 +7,29 @@ import { useColorScheme } from 'nativewind';
 import { useEffect, useState } from 'react';
 import {
   Alert,
+  Dimensions,
   Image,
   Modal,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
 import { supabase } from '../../api/client';
 import { profileAPI } from '../../api/profile';
+  const { width }= Dimensions.get('window');
 
 export default function ProfileScreen() {
   //const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [editModalVisible, setEditModalVisible] = useState(false);
+  const [visibleQR, setVisibleQR] = useState(false);
+
   const { colorScheme } = useColorScheme();
   const router = useRouter();
-
   // Form state
   const [form, setForm] = useState({
     full_name: '',
@@ -80,7 +85,8 @@ export default function ProfileScreen() {
     try {
       const updates = {
           username: form.username,
-          full_name: form.full_name
+          full_name: form.full_name,
+          qr_code: form.username
       };
 
       const { error } = await profileAPI.updateProfile(updates);
@@ -196,6 +202,9 @@ export default function ProfileScreen() {
           { icon: 'settings-outline', label: 'Settings', onPress: () => router.push('/') },
          
           { icon: 'information-circle-outline', label: 'Information', onPress: () => {} },
+
+          { icon: 'qr', label: 'My QR Code', onPress: () => setVisibleQR(true) },
+
         ].map((item, index) => (
           <TouchableOpacity
             key={index}
@@ -219,6 +228,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </View>
 
+      
       {/* Edit Profile Modal */}
       <Modal visible={editModalVisible} animationType="slide">
         <View className="flex-1 bg-gray-50 dark:bg-gray-900">
@@ -287,8 +297,107 @@ export default function ProfileScreen() {
           </ScrollView>
         </View>
       </Modal>
+
+      <Modal
+      animationType="fade"
+      transparent={true}
+      visible={visibleQR}
+    >
+      {/* Lớp nền mờ phía sau */}
+      <View style={styles.overlay}>
+        
+        <View style={styles.modalContainer}>
+          {/* Header của Modal */}
+          <Text style={styles.title}>Mã QR của tôi</Text>
+          <Text style={styles.subtitle}>@{form.username}</Text>
+
+          {/* Vùng chứa QR Code */}
+          <View style={styles.qrWrapper}>
+            {form.username ? (
+              <QRCode
+                value={form.username}
+                size={width * 0.5} // Tự động co giãn theo màn hình
+                color="#000"
+                backgroundColor="#fff"
+              />
+            ) : (
+              <Text>Đang tải...</Text>
+            )}
+          </View>
+
+          <Text style={styles.instruction}>
+            Đưa mã này cho bạn bè để họ quét và kết bạn với bạn nhanh hơn.
+          </Text>
+
+          {/* Nút Đóng */}
+          <TouchableOpacity style={styles.closeButton} onPress={() => setVisibleQR(false)}>
+            <Text style={styles.closeButtonText}>Đóng</Text>
+          </TouchableOpacity>
+        </View>
+
+      </View>
+    </Modal>
     </ScrollView>
   );
 }
+const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)', // Làm tối màn hình nền
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    width: width * 0.85,
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 25,
+    alignItems: 'center',
+    elevation: 10, // Đổ bóng cho Android
+    shadowColor: '#000', // Đổ bóng cho iOS
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 5,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 20,
+  },
+  qrWrapper: {
+    padding: 15,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#eee',
+    borderRadius: 15,
+    marginBottom: 20,
+  },
+  instruction: {
+    textAlign: 'center',
+    color: '#888',
+    fontSize: 14,
+    marginBottom: 25,
+    lineHeight: 20,
+  },
+  closeButton: {
+    backgroundColor: '#007AFF', // Màu xanh đặc trưng iOS
+    paddingVertical: 12,
+    paddingHorizontal: 40,
+    borderRadius: 25,
+    width: '100%',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});
 
 
